@@ -14,7 +14,7 @@ import (
 	
 	rdb "Grep/grep4r/rdb"
 	log "code.google.com/p/log4go"
-	"github.com/wandoulabs/redis-port/pkg/libs/atomic2"
+//	"github.com/wandoulabs/redis-port/pkg/libs/atomic2"
 )
 
 const (
@@ -22,33 +22,35 @@ const (
 	WriterBufferSize = 1024 * 1024 * 8
 )
 
-type CountReader struct {
-	p *atomic2.Int64
-	r io.Reader
-}
+//type CountReader struct {
+//	p *atomic2.Int64
+//	r io.Reader
+//}
+//
+//func NewCountReader(r io.Reader, p *atomic2.Int64) *CountReader {
+//	if p == nil {
+//		p = &atomic2.Int64{}
+//	}
+//	return &CountReader{p: p, r: r}
+//}
+//
+//func (r *CountReader) Count() int64 {
+//	return r.p.Get()
+//}
+//
+//func (r *CountReader) ResetCounter() int64 {
+//	return r.p.Swap(0)
+//}
+//
+//func (r *CountReader) Read(p []byte) (int, error) {
+//	n, err := r.r.Read(p)
+//	r.p.Add(int64(n))
+//	return n, err
+//}
 
-func NewCountReader(r io.Reader, p *atomic2.Int64) *CountReader {
-	if p == nil {
-		p = &atomic2.Int64{}
-	}
-	return &CountReader{p: p, r: r}
-}
-
-func (r *CountReader) Count() int64 {
-	return r.p.Get()
-}
-
-func (r *CountReader) ResetCounter() int64 {
-	return r.p.Swap(0)
-}
-
-func (r *CountReader) Read(p []byte) (int, error) {
-	n, err := r.r.Read(p)
-	r.p.Add(int64(n))
-	return n, err
-}
-
-func parserRDBFile(input string) {
+func parserRDBFile(input string, rdbsize int) {
+	
+	
 	
 	input = "../testredis/repli.dmp"
 	
@@ -57,6 +59,9 @@ func parserRDBFile(input string) {
 	if input != "/dev/stdin" {
 		readin, nsize = openReadFile(input)
 		defer readin.Close()
+		
+		log.Info("parser rdb file, master network rdb size is %d, local file rdb size is %d", rdbsize, nsize)
+		
 	} else {
 		readin, nsize = os.Stdin, 0
 	}
@@ -67,7 +72,7 @@ func parserRDBFile(input string) {
 	pipe := make(chan *rdb.BinEntry, 1024)
 	go func() {
 		defer close(pipe)
-		l := rdb.NewLoader(NewCountReader(reader, nil))
+		l := rdb.NewLoader(reader)
 		if err := l.Header(); err != nil {
 			log.Error("parse rdb header error: %s", err)
 		}

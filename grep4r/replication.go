@@ -6,6 +6,10 @@ import (
 	log "code.google.com/p/log4go"
 )
 
+var (
+	rdbchan = make(chan int)
+)
+
 func openReadFile(name string) (*os.File, int64) {
 	f, err := os.Open(name)
 	if err != nil {
@@ -57,4 +61,8 @@ func writeDumpRDBFile(replyLen int, cn *conn) {
 		}
 		dumpto.Write(b)
 	}
+	
+	rdbchan <- (replyLen + 2)
+	
+	log.Info("redis master rdb size is %d", (replyLen + 2))
 }

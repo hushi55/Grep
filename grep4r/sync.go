@@ -1,11 +1,13 @@
 package main
 
 import (
-	log "code.google.com/p/log4go"
-	"gopkg.in/redis.v3"
+	"net"
+	"time"
+	"bufio"
 	"strconv"
 	"strings"
-	"time"
+	"gopkg.in/redis.v3"
+	log "code.google.com/p/log4go"
 )
 
 func queryRunid() (runid string, offset int64) {
@@ -19,7 +21,7 @@ func queryRunid() (runid string, offset int64) {
 	cmd := redis.NewStringCmd("PSYNC", "?", -1)
 	client.Process(cmd)
 	v, err := cmd.Result()
-	
+
 	defer client.Close()
 
 	runid = "?"
@@ -39,29 +41,33 @@ func queryRunid() (runid string, offset int64) {
 	return
 }
 
-
 var (
 	pongchan = make(chan bool)
 )
 
-func process(cmd Cmder, cn *conn) {
+func sync(cmd Cmder, cn *conn) {
 
 	cn.WriteTimeout = time.Minute * 30
 	cn.ReadTimeout = time.Minute * 30
 
 	log.Info("write cmd ......")
-	
-//	auth := newKeylessStatusCmd("AUTH", "xtkingdee")
-//	cn.writeCmds(auth)
-//	
+
+	//	auth := newKeylessStatusCmd("AUTH", "xtkingdee")
+	//	cn.writeCmds(auth)
+	//
 	cn.writeCmds(cmd)
 	log.Info("write cmd succuss")
 
 	ping := NewStringCmd("PING")
 	pong := "+PONG\r\n"
-//	pong := "*1\r\n$4\r\nPONG\r\n"
+	//	pong := "*1\r\n$4\r\nPONG\r\n"
+
+	//	okrepli := NewStringCmd("+OK")
 	
-//	okrepli := NewStringCmd("+OK")
+	/**
+	 * full data
+	 */
+	go full()
 
 	go func() {
 
@@ -76,11 +82,6 @@ func process(cmd Cmder, cn *conn) {
 				line []byte
 				err  error
 			)
-			//			line = make([]byte, 4096)
-			//			l, err := cn.Read(line)
-			//			if l == 0 {
-			//				continue
-			//			}
 
 			line, _, err = cn.rd.ReadLine()
 
@@ -91,26 +92,19 @@ func process(cmd Cmder, cn *conn) {
 
 			parseLine(line, cn)
 			for cn.rd.Buffered() != 0 {
-				log.Info("还存在数据")
+
+				log.Info("connect buffer's exist data for read")
 
 				line, _, err = cn.rd.ReadLine()
 				parseLine(line, cn)
 
-				//				items, n, err := readScanStatusReply(cn)
-				//				if err == nil {
-				//					log.Info("read readScanReply imtes: %s, count is %d", items, n)
-				//				} else {
-				//					log.Error("readScanReply message error: %s", err)
-				//				}
-
 			}
-			
 
 			if err != nil {
 				log.Error("read message error: %s", err)
 			}
-			
-//			cn.writeCmds(okrepli)
+
+			//			cn.writeCmds(okrepli)
 
 			select {
 			case <-pongchan:
@@ -125,10 +119,10 @@ func process(cmd Cmder, cn *conn) {
 }
 
 func parseLine(line []byte, cn *conn) {
-	
+
 	if len(line) == 0 || isNilReply(line) {
 		log.Warn("read nil reply message")
-		return 
+		return
 	}
 
 	var (
@@ -153,23 +147,10 @@ func parseLine(line []byte, cn *conn) {
 	case arrayReply:
 		val, err = parseArrayReply(cn, sliceParser, line)
 		log.Info("read parseArrayReply ")
-		
-		if err == nil {
-			go func(interface{}){
-				switch vv := val.(type) {
-				case []interface{}:
-					for i := 0; i < len(vv); i++ {
-						log.Info("read message items : %s", vv[i])
-						if vstring, ok := vv[i].(string); ok {
-							if strings.ToLower(vstring) == "ping" {
-								pongchan <- true
-							}
-						}
-					}
-				}
-			}(val)
-		}
 
+		if err == nil {
+			go delta(val)
+		}
 
 	}
 	if err != nil {
@@ -182,5 +163,78 @@ func parseLine(line []byte, cn *conn) {
 		log.Info("read message value is : %s", v)
 	} else {
 		log.Info("read message other value is : %s", val)
+	}
+}
+
+func fullsync() {
+	//	runid, offset := queryRunid()
+
+	log.Info("full sync cmd starting ...")
+	//	cmd := NewStringCmd("PSYNC", runid, offset)
+	cmd := NewStringCmd("SYNC")
+
+	cn, err := net.DialTimeout("tcp", "192.168.22.111:6379", time.Minute*30)
+
+	if err != nil {
+		log.Error("connect master error : %s", err)
+	}
+
+	time.Sleep(time.Second * 5)
+
+	conn := &conn{
+		netcn: cn,
+		buf:   make([]byte, 1024*1024*32),
+	}
+	conn.rd = bufio.NewReader(conn)
+
+	sync(cmd, conn)
+}
+
+func psync() {
+	
+	runid, offset := queryRunid()
+
+	log.Info("psync cmd starting ...")
+	cmd := NewStringCmd("PSYNC", runid, offset)
+
+	cn, err := net.DialTimeout("tcp", "192.168.22.111:6379", time.Minute*30)
+
+	if err != nil {
+		log.Error("connect master error : %s", err)
+	}
+
+	time.Sleep(time.Second * 5)
+
+	conn := &conn{
+		netcn: cn,
+		buf:   make([]byte, 1024*1024*32),
+	}
+	conn.rd = bufio.NewReader(conn)
+
+	sync(cmd, conn)
+}
+
+func full() {
+
+	for {
+		select {
+		case rdbsize := <-rdbchan:
+			go parserRDBFile("./repli.dmp", rdbsize)
+		}
+	}
+
+}
+
+func delta(val interface{}) {
+	switch vv := val.(type) {
+	case []interface{}:
+		for i := 0; i < len(vv); i++ {
+			log.Info("read message items : %s", vv[i])
+			if vstring, ok := vv[i].(string); ok {
+				if strings.ToLower(vstring) == "ping" {
+					pongchan <- true
+				}
+			}
+		}
 	}
 }
