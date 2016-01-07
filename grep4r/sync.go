@@ -72,12 +72,9 @@ func sync(cmd Cmder, cn *conn) {
 
 	go func() {
 
-		count := uint64(0)
+		for count := uint64(0); ; count++{
 
-		for {
-
-			log.Info("read message from connection count is : %d", count)
-			count++
+			log.Info("-------------------------------------- read from master: %d", count)
 
 			var (
 				line []byte
@@ -129,42 +126,47 @@ func parseLine(line []byte, cn *conn) {
 	var (
 		val interface{}
 		err error
+		parsemethod string
+		flag string
 	)
-
-	log.Info("read line[0]: %s", string(line[0]))
+	
+	flag = string(line[0])
 	switch line[0] {
 	case errorReply:
 		err = parseErrorReply(cn, line)
-		log.Info("read parseErrorReply ")
+		parsemethod = "parseErrorReply"
 	case statusReply:
 		val, err = parseStatusReply(cn, line)
-		log.Info("read parseStatusReply ")
+		parsemethod = "parseStatusReply"
 	case intReply:
 		val, err = parseIntReply(cn, line)
-		log.Info("read parseIntReply ")
+		parsemethod = "parseIntReply"
 	case stringReply:
 		val, err = parseBytesReply(cn, line)
-		log.Info("read parseBytesReply ")
+		parsemethod = "parseBytesReply"
 	case arrayReply:
 		val, err = parseArrayReply(cn, sliceParser, line)
-		log.Info("read parseArrayReply ")
+		parsemethod = "parseArrayReply"
 
 		if err == nil {
 			go delta(val)
 		}
 
 	}
+	
+	
 	if err != nil {
-		log.Error("read message error: %s", err)
+		log.Error("read message flag: %s(%s), error: %s",flag, parsemethod, err)
+	} else {
+		if v, ok := val.([]byte); ok {
+			// Convert to string to preserve old behaviour.
+			// TODO: remove in v4
+			log.Info("read message flag: %s(%s), byte value is : %s",flag, parsemethod, v)
+		} else {
+			log.Info("read message flag: %s(%s), other value is : %s",flag, parsemethod, val)
+		}
 	}
 
-	if v, ok := val.([]byte); ok {
-		// Convert to string to preserve old behaviour.
-		// TODO: remove in v4
-		log.Info("read message byte value is : %s", v)
-	} else {
-		log.Info("read message other value is : %s", val)
-	}
 }
 
 func fullsync() {
