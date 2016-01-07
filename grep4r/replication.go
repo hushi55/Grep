@@ -42,7 +42,7 @@ func writeDumpRDBFile(replyLen int, cn *conn) {
 	
 	t := time.Now()
 	
-	file_suffix := t.Format("2006-01-02T15:04")
+	file_suffix := t.Format("2006-01-02T15-04")
 
 	output := Conf.RedisRDBFilePath + "." + file_suffix
 	

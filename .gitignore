@@ -1,3 +1,4 @@
 /.project
 /repli.dmp
 /rdb.dump*
+/*.log*
