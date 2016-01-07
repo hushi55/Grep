@@ -50,10 +50,6 @@ const (
 
 func parserRDBFile(input string, rdbsize int) {
 	
-	
-	
-	input = "../testredis/repli.dmp"
-	
 	var readin io.ReadCloser
 	var nsize int64
 	if input != "/dev/stdin" {

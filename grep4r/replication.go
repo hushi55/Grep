@@ -3,11 +3,17 @@ package main
 import (
 	"io"
 	"os"
+	"time"
 	log "code.google.com/p/log4go"
 )
 
+type rdb_file_info struct {
+	fullfilename string
+	size		 int
+}
+
 var (
-	rdbchan = make(chan int)
+	rdbchan = make(chan rdb_file_info)
 )
 
 func openReadFile(name string) (*os.File, int64) {
@@ -33,8 +39,13 @@ func openWriteFile(name string) *os.File {
 func writeDumpRDBFile(replyLen int, cn *conn) {
 
 	buffsize := 4 * 1024 * 1024
+	
+	t := time.Now()
+	
+	file_suffix := t.Format("2006-01-02T15:04")
 
-	output := "./repli.dmp"
+	output := Conf.RedisRDBFilePath + "." + file_suffix
+	
 	var dumpto io.WriteCloser
 	if output != "/dev/stdout" {
 		dumpto = openWriteFile(output)
@@ -62,7 +73,7 @@ func writeDumpRDBFile(replyLen int, cn *conn) {
 		dumpto.Write(b)
 	}
 	
-	rdbchan <- (replyLen + 2)
+	rdbchan <- rdb_file_info{output, (replyLen + 2)}
 	
 	log.Info("redis master rdb size is %d", (replyLen + 2))
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"fmt"
 	"time"
 	"bufio"
 	"strconv"
@@ -170,13 +171,15 @@ func fullsync() {
 	//	runid, offset := queryRunid()
 
 	log.Info("full sync cmd starting ...")
-	//	cmd := NewStringCmd("PSYNC", runid, offset)
 	cmd := NewStringCmd("SYNC")
-
-	cn, err := net.DialTimeout("tcp", "192.168.22.111:6379", time.Minute*30)
+	
+	addr := fmt.Sprintf("%s:%s", Conf.RedisMasterIP, Conf.RedisMasterPort)
+	cn, err := net.DialTimeout("tcp", addr, time.Minute*30)
 
 	if err != nil {
 		log.Error("connect master error : %s", err)
+	} else {
+		log.Info("connect redis master : %s", addr)
 	}
 
 	time.Sleep(time.Second * 5)
@@ -197,10 +200,13 @@ func psync() {
 	log.Info("psync cmd starting ...")
 	cmd := NewStringCmd("PSYNC", runid, offset)
 
-	cn, err := net.DialTimeout("tcp", "192.168.22.111:6379", time.Minute*30)
+	addr := fmt.Sprintf("%s:%s", Conf.RedisMasterIP, Conf.RedisMasterPort)
+	cn, err := net.DialTimeout("tcp", addr, time.Minute*30)
 
 	if err != nil {
 		log.Error("connect master error : %s", err)
+	} else {
+		log.Info("connect redis master : %s", addr)
 	}
 
 	time.Sleep(time.Second * 5)
@@ -218,8 +224,8 @@ func full() {
 
 	for {
 		select {
-		case rdbsize := <-rdbchan:
-			go parserRDBFile("./repli.dmp", rdbsize)
+		case rdbinfo := <-rdbchan:
+			go parserRDBFile(rdbinfo.fullfilename, rdbinfo.size)
 		}
 	}
 
