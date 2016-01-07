@@ -1,9 +1,8 @@
-package grep4m
+package main
 
 import (
 	"flag"
 	"fmt"
-	. "Grep/grep4m"
 	log "code.google.com/p/log4go"
 )
 

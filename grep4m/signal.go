@@ -1,11 +1,10 @@
 package main
 
 import (
-	. "Grep/grep4m"
-	log "code.google.com/p/log4go"
 	"os"
 	"os/signal"
 	"syscall"
+	log "code.google.com/p/log4go"
 )
 
 // InitSignal register signals handler.

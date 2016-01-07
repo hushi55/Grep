@@ -1,4 +1,4 @@
-package grep4m
+package main
 
 import (
 	"flag"
