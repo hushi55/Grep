@@ -131,7 +131,7 @@ func parseLine(line []byte, cn *conn) {
 		err error
 	)
 
-	log.Error("read line[0]: %s", string(line[0]))
+	log.Info("read line[0]: %s", string(line[0]))
 	switch line[0] {
 	case errorReply:
 		err = parseErrorReply(cn, line)
@@ -161,14 +161,13 @@ func parseLine(line []byte, cn *conn) {
 	if v, ok := val.([]byte); ok {
 		// Convert to string to preserve old behaviour.
 		// TODO: remove in v4
-		log.Info("read message value is : %s", v)
+		log.Info("read message byte value is : %s", v)
 	} else {
 		log.Info("read message other value is : %s", val)
 	}
 }
 
 func fullsync() {
-	//	runid, offset := queryRunid()
 
 	log.Info("full sync cmd starting ...")
 	cmd := NewStringCmd("SYNC")
