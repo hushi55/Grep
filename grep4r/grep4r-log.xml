@@ -5,11 +5,11 @@
     <!-- level is (:?FINEST|FINE|DEBUG|TRACE|INFO|WARNING|ERROR) -->
     <level>DEBUG</level>
   </filter>
-  <filter enabled="false">
+  <filter enabled="true">
     <tag>debug_file</tag>
     <type>file</type>
     <level>DEBUG</level>
-    <property name="filename">/tmp/grep4m_debug.log</property>
+    <property name="filename">./grep4m_debug.log</property>
     <property name="format">[%D %T] [%L] [%S] %M</property>
     <property name="rotate">true</property> <!-- true enables log rotation, otherwise append -->
     <property name="maxsize">0M</property> <!-- \d+[KMG]? Suffixes are in terms of 2**10 -->
