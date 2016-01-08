@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 	log "code.google.com/p/log4go"
 )
 
@@ -270,6 +271,17 @@ func readN(cn *conn, n int) ([]byte, error) {
 	return b, err
 }
 
+func readAtMost(cn *conn, n int) ([]byte, error) {
+	var b []byte
+	if cap(cn.buf) < n {
+		b = make([]byte, n)
+	} else {
+		b = cn.buf[:n]
+	}
+	_, err := cn.rd.Read(b)
+	return b, err
+}
+
 //------------------------------------------------------------------------------
 
 func parseErrorReply(cn *conn, line []byte) error {
@@ -307,25 +319,35 @@ func parseBytesReply(cn *conn, line []byte) ([]byte, error) {
 	if isNilReply(line) {
 		return nil, Nil
 	}
+	
+	if strings.HasPrefix(bytesToString(line[1:]), "EOF:") {
+		log.Info("redis replication rdb file size over 4G, end of file is: %s", string(line[1:]));
+		
+		writeDumpRDBFileOver4G(bytesToString(line[6:]), cn)
+			
+		return nil, Nil
+	}
 
 	replyLen, err := strconv.Atoi(bytesToString(line[1:]))
-	if err != nil {
+	if err != nil {//EOF:0862be50e11f20e031451e4c5eeadccec276b3b4
 		return nil, err
-	}
-	
-	if replyLen > 16*1024*1024 { // 写文件 
-		
-		writeDumpRDBFile(replyLen, cn)
-		
-		return nil, nil
 	} else {
-		b, err := readN(cn, replyLen+2)
-		if err != nil {
-			return nil, err
+		if replyLen > 16*1024*1024 { // 写文件 
+			
+			writeDumpRDBFile(replyLen, cn)
+			
+			return nil, nil
+		} else {
+			b, err := readN(cn, replyLen+2)
+			if err != nil {
+				return nil, err
+			}
+		
+			return b[:replyLen], nil
 		}
-	
-		return b[:replyLen], nil
+		
 	}
+	
 
 }
 

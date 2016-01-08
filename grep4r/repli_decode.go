@@ -48,7 +48,7 @@ const (
 //	return n, err
 //}
 
-func parserRDBFile(input string, rdbsize int) {
+func parserRDBFile(input string, rdbsize uint64) {
 	
 	var readin io.ReadCloser
 	var nsize int64
@@ -90,8 +90,6 @@ func parserRDBFile(input string, rdbsize int) {
 	
 	
 	go decoder(pipe)
-	
-	InitSignal()
 	
 	log.Info("nsize is %d", nsize)
 }

@@ -1,21 +1,23 @@
 package main
 
 import (
-	"net"
-	"fmt"
-	"time"
 	"bufio"
+	log "code.google.com/p/log4go"
+	"fmt"
+	"gopkg.in/redis.v3"
+	"net"
+	"io"
 	"strconv"
 	"strings"
-	"gopkg.in/redis.v3"
-	log "code.google.com/p/log4go"
+	"time"
 )
 
 func queryRunid() (runid string, offset int64) {
 
+	addr := fmt.Sprintf("%s:%s", Conf.RedisMasterIP, Conf.RedisMasterPort)
 	client := redis.NewClient(&redis.Options{
-		Addr:     "192.168.22.111:6379",
-		Password: "", // no password set
+		Addr:     addr,
+		Password: Conf.RedisMasterPasswd, // no password set
 		DB:       0,  // use default DB
 	})
 
@@ -52,57 +54,33 @@ func sync(cmd Cmder, cn *conn) {
 	cn.ReadTimeout = time.Minute * 30
 
 	log.Info("write cmd ......")
-
-	//	auth := newKeylessStatusCmd("AUTH", "xtkingdee")
-	//	cn.writeCmds(auth)
-	//
 	cn.writeCmds(cmd)
 	log.Info("write cmd succuss")
 
 	ping := NewStringCmd("PING")
 	pong := "+PONG\r\n"
-	//	pong := "*1\r\n$4\r\nPONG\r\n"
 
-	//	okrepli := NewStringCmd("+OK")
-	
 	/**
 	 * full data
 	 */
 	go full()
 
 	go func() {
-
-		for count := uint64(0); ; count++{
+		
+		defer cn.Close()
+		
+		for count := uint64(0); ; count++ {
 
 			log.Info("-------------------------------------- read from master: %d", count)
 
-			var (
-				line []byte
-				err  error
-			)
-
-			line, _, err = cn.rd.ReadLine()
-
-			if len(line) == 0 || isNilReply(line) {
-				log.Error("read nil reply message")
-				continue
+			err := parseConnect(cn)
+			
+			// retry 
+			if err == io.EOF {
+				RetryPsync <- true
+				return 
 			}
-
-			parseLine(line, cn)
-			for cn.rd.Buffered() != 0 {
-
-				log.Info("connect buffer's exist data for read")
-
-				line, _, err = cn.rd.ReadLine()
-				parseLine(line, cn)
-
-			}
-
-			if err != nil {
-				log.Error("read message error: %s", err)
-			}
-
-			//			cn.writeCmds(okrepli)
+			
 
 			select {
 			case <-pongchan:
@@ -113,7 +91,40 @@ func sync(cmd Cmder, cn *conn) {
 
 		}
 	}()
+	
+	
 
+}
+
+func parseConnect(cn *conn) (err error) {
+
+	var (
+		line []byte
+	)
+
+	line, _, err = cn.rd.ReadLine()
+	
+	if err != nil {
+		log.Error("read message error: %s", err)
+		return 
+	}
+
+	if len(line) == 0 || isNilReply(line) {
+		log.Error("read nil reply message")
+		return
+	}
+
+	parseLine(line, cn)
+	for cn.rd.Buffered() != 0 {
+
+		log.Info("connect buffer's exist data for read")
+
+		line, _, err = cn.rd.ReadLine()
+		parseLine(line, cn)
+
+	}
+	
+	return 
 }
 
 func parseLine(line []byte, cn *conn) {
@@ -124,12 +135,12 @@ func parseLine(line []byte, cn *conn) {
 	}
 
 	var (
-		val interface{}
-		err error
+		val         interface{}
+		err         error
 		parsemethod string
-		flag string
+		flag        string
 	)
-	
+
 	flag = string(line[0])
 	switch line[0] {
 	case errorReply:
@@ -153,27 +164,27 @@ func parseLine(line []byte, cn *conn) {
 		}
 
 	}
-	
-	
+
 	if err != nil {
-		log.Error("read message flag: %s(%s), error: %s",flag, parsemethod, err)
+		log.Error("read message flag: %s(%s), error: %s", flag, parsemethod, err)
 	} else {
 		if v, ok := val.([]byte); ok {
 			// Convert to string to preserve old behaviour.
 			// TODO: remove in v4
-			log.Info("read message flag: %s(%s), byte value is : %s",flag, parsemethod, v)
+			log.Info("read message flag: %s(%s), byte value is : %s", flag, parsemethod, v)
 		} else {
-			log.Info("read message flag: %s(%s), other value is : %s",flag, parsemethod, val)
+			log.Info("read message flag: %s(%s), other value is : %s", flag, parsemethod, val)
 		}
 	}
 
 }
 
+// sync command
 func fullsync() {
 
 	log.Info("full sync cmd starting ...")
 	cmd := NewStringCmd("SYNC")
-	
+
 	addr := fmt.Sprintf("%s:%s", Conf.RedisMasterIP, Conf.RedisMasterPort)
 	cn, err := net.DialTimeout("tcp", addr, time.Minute*30)
 
@@ -191,11 +202,26 @@ func fullsync() {
 	}
 	conn.rd = bufio.NewReader(conn)
 
+	redisAuth(conn)
+
 	sync(cmd, conn)
 }
 
+func redisAuth(conn *conn) {
+	// redis auth
+	if Conf.RedisMasterPasswd != "" {
+		auth := newKeylessStatusCmd("AUTH", Conf.RedisMasterPasswd)
+		conn.writeCmds(auth)
+
+		time.Sleep(time.Second * 2)
+
+		parseConnect(conn)
+	}
+}
+
+// psync command
 func psync() {
-	
+
 	runid, offset := queryRunid()
 
 	log.Info("psync cmd starting ...")
@@ -217,6 +243,8 @@ func psync() {
 		buf:   make([]byte, 1024*1024*32),
 	}
 	conn.rd = bufio.NewReader(conn)
+	
+	redisAuth(conn)
 
 	sync(cmd, conn)
 }
