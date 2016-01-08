@@ -118,8 +118,8 @@ func writeDumpRDBFileOver4G(eof string, cn *conn) {
 //	eofLast 	:= make([]byte, eofFlagLen)
 	
 	for {
-		b, err := readAtMost(cn, buffsize)
-		writeLen := len(b)
+		b, writeLen, err := readAtMost(cn, buffsize)
+//		writeLen := len(b)
 		
 		if err != nil {
 			log.Error("write dump rdb file err: %s", err)
@@ -131,18 +131,18 @@ func writeDumpRDBFileOver4G(eof string, cn *conn) {
 //		index := strings.Index(strings.Join([]string{bytesToString(eofLast), bytesToString(b)}, ""), eofFlag)
 //		if index != -1 {
 		if cn.rd.Buffered() == 0 && strings.HasSuffix(bytesToString(b), eof) {
-//			if index > eofFlagLen {
-//				dumpto.Write(b[:(index-eofFlagLen)])
-//				replyLen += uint64(index-eofFlagLen)
-//				break
-//			}
+			if writeLen > eofFlagLen {
+				dumpto.Write(b[:(writeLen-eofFlagLen)])
+				replyLen += uint64(writeLen-eofFlagLen)
+				break
+			}
 
-			dumpto.Write(b[:(len(b)-eofFlagLen)])
-			replyLen += uint64(len(b)-eofFlagLen)
-			break
+//			dumpto.Write(b[:(len(b)-eofFlagLen)])
+//			replyLen += uint64(len(b)-eofFlagLen)
+//			break
 		} 
 		
-		dumpto.Write(b)
+		dumpto.Write(b[:writeLen])
 //		eofLast = b[(writeLen-eofFlagLen):]
 		
 		replyLen += uint64(writeLen)

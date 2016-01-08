@@ -271,15 +271,15 @@ func readN(cn *conn, n int) ([]byte, error) {
 	return b, err
 }
 
-func readAtMost(cn *conn, n int) ([]byte, error) {
+func readAtMost(cn *conn, n int) ([]byte, int, error) {
 	var b []byte
 	if cap(cn.buf) < n {
 		b = make([]byte, n)
 	} else {
 		b = cn.buf[:n]
 	}
-	_, err := cn.rd.Read(b)
-	return b, err
+	count, err := cn.rd.Read(b)
+	return b, count, err
 }
 
 //------------------------------------------------------------------------------
