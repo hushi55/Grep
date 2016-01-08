@@ -130,10 +130,13 @@ func writeDumpRDBFileOver4G(eof string, cn *conn) {
 		
 //		index := strings.Index(strings.Join([]string{bytesToString(eofLast), bytesToString(b)}, ""), eofFlag)
 //		if index != -1 {
-		if cn.rd.Buffered() == 0 && strings.HasSuffix(bytesToString(b), eof) {
+		if cn.rd.Buffered() == 0 && strings.HasSuffix(bytesToString(b[:writeLen]), eof) {
 			if writeLen > eofFlagLen {
 				dumpto.Write(b[:(writeLen-eofFlagLen)])
 				replyLen += uint64(writeLen-eofFlagLen)
+				
+				cn.writeCmds(redisReplicationACK(replyLen))
+				
 				break
 			}
 

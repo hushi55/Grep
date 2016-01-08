@@ -273,3 +273,7 @@ func delta(val interface{}) {
 		}
 	}
 }
+
+func redisReplicationACK(offset uint64) *StringCmd{
+	return NewStringCmd("REPLCONF", "ACK", offset)
+}
