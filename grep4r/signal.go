@@ -17,25 +17,25 @@ func InitSignal() {
 	signal.Notify(c, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
 	for {
 		s := <-c
-		log.Info("grep4m get a signal %s", s.String())
+		log.Info("process get a signal %s", s.String())
 		switch s {
 		//case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGSTOP, syscall.SIGINT:
 		case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
 			return
 		case syscall.SIGHUP:
 			//TODO reload
-//			reload()
+			reload()
 		default:
 			return
 		}
 	}
 }
 
-//func reload() {
-//	newConf, err := ReloadConfig()
-//	if err != nil {
-//		log.Error("ReloadConfig() error(%v)", err)
-//		return
-//	}
-//	Conf = newConf
-//}
+func reload() {
+	newConf, err := ReloadConfig()
+	if err != nil {
+		log.Error("ReloadConfig() error(%v)", err)
+		return
+	}
+	Conf = newConf
+}
