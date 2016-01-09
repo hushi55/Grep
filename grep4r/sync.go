@@ -62,8 +62,6 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 				offset = i
 			}
 		}
-		
-		writecp(&redisRepliInfo{runid, offset}, "sync init values")
 	}
 	
 	cn.ResetReadCount()
@@ -78,6 +76,10 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 	if isFullResync {
 		runid = f_runid
 		offset = f_offset
+	}
+	
+	if offset > 0 {
+		writecp(&redisRepliInfo{runid, offset}, "sync init values")
 	}
 	
 	log.Info("write cmd succuss")

@@ -17,7 +17,7 @@ var (
 	cpLog        = log.NewLogger()
 	CP_FILE_NAME = "checkpoint"
 	initFlag	 = false
-	cplen        = len("[2016/01/09 19:37:39 CST] [INFO] (main.writecp:81) 09853e6ab47ec0ce0a585f0fd55118f1a4671ddd 6231782484598587392")
+	cplen        = len("[2016/01/10 00:56:22 CST] [INFO] (main.writecp:93) 09853e6ab47ec0ce0a585f0fd55118f1a4671ddd  6231782484598587392")
 )
 
 func init() {
@@ -48,7 +48,9 @@ func initRedisRepilcationInfo() (string, int64) {
 	fname := CP_FILE_NAME
 	
 	if _, err := os.Stat(fname); os.IsNotExist(err) {
-	  return "?", -1
+		
+		log.Warn("checkpoint file(%s) no exit", fname)	
+		return "?", -1
 	}
 	
 	file, err := os.Open(fname)
@@ -70,18 +72,25 @@ func initRedisRepilcationInfo() (string, int64) {
 			l := len(items)
 			if (l > 1) {
 				v := items[l-1] //last item
-				offset, err := strconv.ParseInt(strings.Trim(v, "\n"), 10, 64)
+				offset, err := strconv.ParseInt(strings.TrimRight(v, "\n"), 10, 64)
 				if err == nil {
+					log.Info("parse checkpoint file(%s) runid is : %s, offset is %d", fname, items[l-2], offset)
 					return items[l-2], offset
+				} else {
+					log.Warn("can not parse checkpoint file(%s), error is %s", fname, err)
 				}
 			}
+			
+			log.Warn("can not parse checkpoint file(%s), read last line %s", fname, string(buf))
+			log.Warn("can not parse checkpoint file(%s), split len is %d, item is %s", fname, l, items)
 		}
 	}
 
+	log.Warn("can not parse checkpoint file(%s)", fname)
 	return "?", -1
 }
 
 func writecp(cp *redisRepliInfo, msg string) {
 	log.Info("write check point to file by reason of %s ...", msg)
-	cpLog.Info("%s	%d", cp.runid, cp.offset)
+	cpLog.Info("%s  %d", cp.runid, cp.offset)
 }
