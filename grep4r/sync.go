@@ -282,7 +282,8 @@ func parseFullResync(cn *conn) (bool, string, int64) {
 func fullsync() {
 
 	log.Info("full sync cmd starting ...")
-	cmd := NewStringCmd("SYNC")
+//	cmd := NewStringCmd("SYNC")
+	cmd := NewStringCmd("PSYNC", "?", -1)
 
 	addr := fmt.Sprintf("%s:%s", Conf.RedisMasterIP, Conf.RedisMasterPort)
 	cn, err := net.DialTimeout("tcp", addr, time.Minute*30)
