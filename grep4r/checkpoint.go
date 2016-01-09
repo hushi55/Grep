@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"fmt"
 	"time"
 	"strconv"
 	"strings"
@@ -15,11 +14,18 @@ type redisRepliInfo struct {
 }
 
 var (
-	checkpoint   = make(chan *redisRepliInfo, 1)
 	cpLog        = log.NewLogger()
 	CP_FILE_NAME = "checkpoint"
-	cplen        = len("[2015/12/24 17:38:47 CST] [INFO] (mongodb-driver/grep4m.writecp:106) 6231782484598587392")
+	initFlag	 = false
+	cplen        = len("[2016/01/09 19:37:39 CST] [INFO] (main.writecp:81) 09853e6ab47ec0ce0a585f0fd55118f1a4671ddd 6231782484598587392")
 )
+
+func init() {
+	if !initFlag {
+		cpLog.AddFilter("log", log.FINE, log.NewFileLogWriter(CP_FILE_NAME, false))
+		initFlag = true
+	}
+}
 
 type deamon_timer struct {
 	timer *time.Timer
@@ -38,33 +44,7 @@ func (this *deamon_timer) reset() {
 	this.timer.Reset(this.d)
 }
 
-// checkpoing deamon go
-func StartCheckpointDeamon() {
-
-	cpLog.AddFilter("log", log.FINE, log.NewFileLogWriter(CP_FILE_NAME, false))
-
-//	t := newDeamonTimer(Conf.CheckPointTimeout)
-
-	go func() {
-		for {
-			select {
-			case cp := <-checkpoint:
-
-				writecp(cp, fmt.Sprintf("exceed threshold %d", Conf.CheckPointThreshold))
-
-//				t.reset()
-
-//			case <-time.After(Conf.CheckPointTimeout):
-//				seconds := int32(time.Now().Unix())
-//				writecp(int64(seconds)<<32, fmt.Sprintf("timeout %d millisecond", Conf.CheckPointTimeout/(1000*1000)))
-//
-////				t.reset()
-			}
-		}
-	}()
-}
-
-func initCheckpoint() (string, int64) {
+func initRedisRepilcationInfo() (string, int64) {
 	fname := CP_FILE_NAME
 	file, err := os.Open(fname)
 	if err != nil {

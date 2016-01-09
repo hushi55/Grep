@@ -64,7 +64,7 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 			}
 		}
 		
-		checkpoint <- &redisRepliInfo{runid, offset}
+		writecp(&redisRepliInfo{runid, offset}, "sync init values")
 	}
 	
 	cn.ResetReadCount()
@@ -72,7 +72,7 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 	cn.WriteTimeout = time.Minute * 30
 	cn.ReadTimeout = time.Minute * 30
 
-	log.Info("write cmd ......", runid, offset)
+	log.Info("write cmd ......")
 	cn.writeCmds(cmd)
 	log.Info("write cmd succuss")
 
@@ -82,13 +82,14 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 	 * full data
 	 */
 	go full()
-
-	cptimer := newDeamonTimer(time.Second * 5)
-	StartCheckpointDeamon()
+	
+	cptimer := newDeamonTimer(Conf.CheckPointTimeout)
 	
 	go func() {
 		
 		defer cn.Close()
+		
+		countReadByte := cn.GetReadCount()
 		
 		for count := uint64(0); ; count++ {
 
@@ -102,13 +103,22 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 				return 
 			}
 			
+			if  uint64(cn.GetReadCount() - countReadByte) > Conf.CheckPointThreshold {
+				
+				countReadByte = cn.GetReadCount()
+				writecp(&redisRepliInfo{runid, offset + cn.GetReadCount()},
+					 fmt.Sprintf("exceed threshold %d", Conf.CheckPointThreshold))
+			}
+			
 
 			select {
 			case <-pongchan:
 				redisReplicationACK(cn, uint64(offset + cn.GetReadCount()) )
+				
 			case <-cptimer.timer.C :
 				
-				checkpoint <- &redisRepliInfo{runid, offset + cn.GetReadCount()}
+				writecp(&redisRepliInfo{runid, offset + cn.GetReadCount()},
+					 fmt.Sprintf("timeout %d millisecond", Conf.CheckPointTimeout/(1000*1000)))
 				cptimer.reset()				
 
 			case <-time.After(time.Second * 1):
@@ -117,8 +127,6 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 
 		}
 	}()
-	
-	
 
 }
 

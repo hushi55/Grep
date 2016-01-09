@@ -92,7 +92,7 @@ func writeDumpRDBFile(replyLen int, cn *conn) {
  * delimiter is long and random enough that the probability of a
  * collision with the actual file content can be ignored. 
  */
-func writeDumpRDBFileOver4G(eof string, cn *conn) {
+func writeDumpRDBFileDiskless(eof string, cn *conn) {
 
 	buffsize := 4 * 1024 * 1024
 	
