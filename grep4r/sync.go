@@ -4,45 +4,44 @@ import (
 	"bufio"
 	log "code.google.com/p/log4go"
 	"fmt"
-	"gopkg.in/redis.v3"
 	"net"
 	"io"
-	"strconv"
 	"strings"
 	"time"
+	"strconv"
 )
 
-func queryRunid() (runid string, offset int64) {
-
-	addr := fmt.Sprintf("%s:%s", Conf.RedisMasterIP, Conf.RedisMasterPort)
-	client := redis.NewClient(&redis.Options{
-		Addr:     addr,
-		Password: Conf.RedisMasterPasswd, // no password set
-		DB:       0,  // use default DB
-	})
-
-	cmd := redis.NewStringCmd("PSYNC", "?", -1)
-	client.Process(cmd)
-	v, err := cmd.Result()
-
-	defer client.Close()
-
-	runid = "?"
-	offset = -1
-
-	if err == nil {
-		items := strings.Split(v, " ")
-		if len(items) == 3 {
-			runid = items[1]
-			offset, _ = strconv.ParseInt(items[2], 10, 64)
-		}
-	} else {
-		log.Info("psync error : %s", err)
-	}
-
-	log.Info("psync runid is %s, offset is %d", runid, offset)
-	return
-}
+//func queryRunid() (runid string, offset int64) {
+//
+//	addr := fmt.Sprintf("%s:%s", Conf.RedisMasterIP, Conf.RedisMasterPort)
+//	client := redis.NewClient(&redis.Options{
+//		Addr:     addr,
+//		Password: Conf.RedisMasterPasswd, // no password set
+//		DB:       0,  // use default DB
+//	})
+//
+//	cmd := redis.NewStringCmd("PSYNC", "?", -1)
+//	client.Process(cmd)
+//	v, err := cmd.Result()
+//
+//	defer client.Close()
+//
+//	runid = "?"
+//	offset = -1
+//
+//	if err == nil {
+//		items := strings.Split(v, " ")
+//		if len(items) == 3 {
+//			runid = items[1]
+//			offset, _ = strconv.ParseInt(items[2], 10, 64)
+//		}
+//	} else {
+//		log.Info("psync error : %s", err)
+//	}
+//
+//	log.Info("psync runid is %s, offset is %d", runid, offset)
+//	return
+//}
 
 var (
 	pongchan = make(chan bool)
@@ -74,6 +73,13 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 
 	log.Info("write cmd ......")
 	cn.writeCmds(cmd)
+	
+	isFullResync, f_runid, f_offset := parseFullResync(cn)
+	if isFullResync {
+		runid = f_runid
+		offset = f_offset
+	}
+	
 	log.Info("write cmd succuss")
 
 	/**
@@ -93,7 +99,7 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 			for {
 				select {
 				case <- pongchan:
-					redisReplicationACK(cn, uint64(offset + cn.GetReadCount()) )
+					redisReplicationACK(cn, uint64(offset + cn.GetReadCount()))
 					
 				case <- cptimer.timer.C :
 					
@@ -220,6 +226,58 @@ func parseLine(line []byte, cn *conn) {
 
 }
 
+func parseFullResync(cn *conn) (bool, string, int64) {
+	var (
+		line []byte
+	)
+
+	line, _, err := cn.rd.ReadLine()
+	
+	if err != nil {
+		log.Error("read message error: %s", err)
+		return false, "?", -1
+	}
+
+	if len(line) == 0 || isNilReply(line) {
+		log.Error("read nil reply message")
+		return false, "?", -1
+	}
+	
+	var(
+		flag = string(line[0])
+		parsemethod string
+	)
+	
+	switch line[0] {
+	case errorReply:
+		err = parseErrorReply(cn, line)
+		parsemethod = "parseErrorReply"
+	case statusReply:
+		val, err := parseStatusReply(cn, line)
+		
+		parsemethod = "parseStatusReply"
+		
+		if err == nil {
+			if strings.HasPrefix(string(val), "FULLRESYNC") {
+				items := strings.Split(string(val), " ")
+				if len(items) == 3 {
+					runid := items[1]
+					offset, _ := strconv.ParseInt(items[2], 10, 64)
+					writecp(&redisRepliInfo{runid, offset}, "FULLRESYNC init values")
+					
+					log.Info("read message flag: %s(%s), byte value is : %s", flag, parsemethod, val)
+					
+					return true, runid, offset
+				}
+			}
+		}
+	}
+	
+	log.Info("read message flag: %s(%s), byte value is : %s", flag, parsemethod, string(line))
+	
+	return false, "?", -1
+}
+
 // sync command
 func fullsync() {
 
@@ -263,7 +321,7 @@ func redisAuth(conn *conn) {
 // psync command
 func psync() {
 
-	runid, offset := queryRunid()
+	runid, offset := initRedisRepilcationInfo()
 
 	log.Info("psync cmd starting ...")
 	cmd := NewStringCmd("PSYNC", runid, offset)
