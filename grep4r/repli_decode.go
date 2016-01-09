@@ -52,6 +52,7 @@ func parserRDBFile(input string, rdbsize uint64) {
 	
 	var readin io.ReadCloser
 	var nsize int64
+	wait := make(chan bool)
 	if input != "/dev/stdin" {
 		readin, nsize = openReadFile(input)
 		defer readin.Close()
@@ -86,10 +87,18 @@ func parserRDBFile(input string, rdbsize uint64) {
 				}
 			}
 		}
+		
+		wait <- false
+		
 	}()
 	
 	
 	go decoder(pipe)
+	
+	select {
+		case <- wait:
+		log.Info("parser rdb file successful")
+	}
 	
 	log.Info("nsize is %d", nsize)
 }
