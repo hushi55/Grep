@@ -46,6 +46,11 @@ func (this *deamon_timer) reset() {
 
 func initRedisRepilcationInfo() (string, int64) {
 	fname := CP_FILE_NAME
+	
+	if _, err := os.Stat(fname); os.IsNotExist(err) {
+	  return "?", -1
+	}
+	
 	file, err := os.Open(fname)
 	if err != nil {
 		panic(err)
