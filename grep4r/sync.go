@@ -48,17 +48,33 @@ var (
 	pongchan = make(chan bool)
 )
 
-func sync(cmd Cmder, cn *conn) {
+func sync(cmd Cmder, cn *conn, other ...interface{}) {
+	
+	var (
+		 offset = int64(0)
+		 runid  = "?"
+	)
+	
+	if other != nil {
+		for _, e := range other {
+			if s, ok := e.(string); ok {
+				runid = s
+			} else if i, ok2 := e.(int64); ok2 {
+				offset = i
+			}
+		}
+	}
+	
+	cn.ResetReadCount()
 
 	cn.WriteTimeout = time.Minute * 30
 	cn.ReadTimeout = time.Minute * 30
 
-	log.Info("write cmd ......")
+	log.Info("write cmd ......", runid, offset)
 	cn.writeCmds(cmd)
 	log.Info("write cmd succuss")
 
 	ping := NewStringCmd("PING")
-	pong := "+PONG\r\n"
 
 	/**
 	 * full data
@@ -71,7 +87,7 @@ func sync(cmd Cmder, cn *conn) {
 		
 		for count := uint64(0); ; count++ {
 
-			log.Info("-------------------------------------- read from master: %d", count)
+			log.Info("-------------------------------------- read from master: %d, read bytecount: %d", count, cn.GetReadCount())
 
 			err := parseConnect(cn)
 			
@@ -84,7 +100,7 @@ func sync(cmd Cmder, cn *conn) {
 
 			select {
 			case <-pongchan:
-				cn.Write([]byte(pong))
+				redisReplicationACK(cn, uint64(offset + cn.GetReadCount()) )
 			case <-time.After(time.Second * 1):
 				cn.writeCmds(ping)
 			}
@@ -246,7 +262,8 @@ func psync() {
 	
 	redisAuth(conn)
 
-	sync(cmd, conn)
+	sync(cmd, conn, runid, offset)
+	
 }
 
 func full() {
@@ -274,6 +291,6 @@ func delta(val interface{}) {
 	}
 }
 
-func redisReplicationACK(offset uint64) *StringCmd{
-	return NewStringCmd("REPLCONF", "ACK", offset)
+func redisReplicationACK(cn *conn, offset uint64){
+	cn.writeCmds( NewStringCmd("REPLCONF", "ACK", offset))
 }

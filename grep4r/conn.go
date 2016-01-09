@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"net"
 	"time"
+	"github.com/hushi55/golib/lang/atomic"
 )
 
 const defaultBufSize = 4096
@@ -16,6 +17,8 @@ type conn struct {
 	netcn net.Conn
 	rd    *bufio.Reader
 	buf   []byte
+	
+	rc	 atomic.Int64
 
 	usedAt       time.Time
 	ReadTimeout  time.Duration
@@ -91,7 +94,12 @@ func (cn *conn) Read(b []byte) (int, error) {
 	} else {
 		cn.netcn.SetReadDeadline(zeroTime)
 	}
-	return cn.netcn.Read(b)
+	
+	n, err := cn.netcn.Read(b);
+	
+	cn.rc.Add(int64(n))
+	
+	return n, err
 }
 
 func (cn *conn) Write(b []byte) (int, error) {
@@ -105,6 +113,14 @@ func (cn *conn) Write(b []byte) (int, error) {
 
 func (cn *conn) RemoteAddr() net.Addr {
 	return cn.netcn.RemoteAddr()
+}
+
+func (cn *conn) ResetReadCount() {
+	cn.rc.Set(0);
+}
+
+func (cn *conn) GetReadCount() int64 {
+	return cn.rc.Get()
 }
 
 func (cn *conn) Close() error {

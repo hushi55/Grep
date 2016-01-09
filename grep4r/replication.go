@@ -135,7 +135,7 @@ func writeDumpRDBFileOver4G(eof string, cn *conn) {
 				dumpto.Write(b[:(writeLen-eofFlagLen)])
 				replyLen += uint64(writeLen-eofFlagLen)
 				
-				cn.writeCmds(redisReplicationACK(replyLen))
+				redisReplicationACK(cn, replyLen)
 				
 				break
 			}

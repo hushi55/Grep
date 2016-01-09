@@ -320,7 +320,7 @@ func parseBytesReply(cn *conn, line []byte) ([]byte, error) {
 		return nil, Nil
 	}
 	
-	if strings.HasPrefix(bytesToString(line[1:]), "EOF:") {
+	if strings.HasPrefix(bytesToString(line[1:]), "EOF:") { //EOF:0862be50e11f20e031451e4c5eeadccec276b3b4
 		log.Info("redis replication rdb file size over 4G, end of file is: %s", string(line[1:]));
 		
 		writeDumpRDBFileOver4G(bytesToString(line[6:]), cn)
@@ -329,7 +329,7 @@ func parseBytesReply(cn *conn, line []byte) ([]byte, error) {
 	}
 
 	replyLen, err := strconv.Atoi(bytesToString(line[1:]))
-	if err != nil {//EOF:0862be50e11f20e031451e4c5eeadccec276b3b4
+	if err != nil {
 		return nil, err
 	} else {
 		if replyLen > 16*1024*1024 { // 写文件 
