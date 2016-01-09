@@ -112,14 +112,11 @@ func writeDumpRDBFileOver4G(eof string, cn *conn) {
 
 	replyLen := uint64(0)
 	
-//	eofFlag 	:= "^" + eof
 	eofFlag 	:= eof
 	eofFlagLen 	:= len(eofFlag)
-//	eofLast 	:= make([]byte, eofFlagLen)
 	
 	for {
 		b, writeLen, err := readAtMost(cn, buffsize)
-//		writeLen := len(b)
 		
 		if err != nil {
 			log.Error("write dump rdb file err: %s", err)
@@ -128,8 +125,6 @@ func writeDumpRDBFileOver4G(eof string, cn *conn) {
 		
 		
 		
-//		index := strings.Index(strings.Join([]string{bytesToString(eofLast), bytesToString(b)}, ""), eofFlag)
-//		if index != -1 {
 		if cn.rd.Buffered() == 0 && strings.HasSuffix(bytesToString(b[:writeLen]), eof) {
 			if writeLen > eofFlagLen {
 				dumpto.Write(b[:(writeLen-eofFlagLen)])
@@ -140,13 +135,9 @@ func writeDumpRDBFileOver4G(eof string, cn *conn) {
 				break
 			}
 
-//			dumpto.Write(b[:(len(b)-eofFlagLen)])
-//			replyLen += uint64(len(b)-eofFlagLen)
-//			break
 		} 
 		
 		dumpto.Write(b[:writeLen])
-//		eofLast = b[(writeLen-eofFlagLen):]
 		
 		replyLen += uint64(writeLen)
 		log.Info("==================================== full sync %d", replyLen)

@@ -22,32 +22,6 @@ const (
 	WriterBufferSize = 1024 * 1024 * 8
 )
 
-//type CountReader struct {
-//	p *atomic2.Int64
-//	r io.Reader
-//}
-//
-//func NewCountReader(r io.Reader, p *atomic2.Int64) *CountReader {
-//	if p == nil {
-//		p = &atomic2.Int64{}
-//	}
-//	return &CountReader{p: p, r: r}
-//}
-//
-//func (r *CountReader) Count() int64 {
-//	return r.p.Get()
-//}
-//
-//func (r *CountReader) ResetCounter() int64 {
-//	return r.p.Swap(0)
-//}
-//
-//func (r *CountReader) Read(p []byte) (int, error) {
-//	n, err := r.r.Read(p)
-//	r.p.Add(int64(n))
-//	return n, err
-//}
-
 func parserRDBFile(input string, rdbsize uint64) {
 	
 	var readin io.ReadCloser
