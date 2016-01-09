@@ -76,18 +76,39 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 	cn.writeCmds(cmd)
 	log.Info("write cmd succuss")
 
-	ping := NewStringCmd("PING")
-
 	/**
 	 * full data
 	 */
 	go full()
 	
-	cptimer := newDeamonTimer(Conf.CheckPointTimeout)
 	
 	go func() {
 		
 		defer cn.Close()
+		
+		cptimer := newDeamonTimer(Conf.CheckPointTimeout)
+		threshold := make(chan *redisRepliInfo)
+		
+		go func(){
+			for {
+				select {
+				case <- pongchan:
+					redisReplicationACK(cn, uint64(offset + cn.GetReadCount()) )
+					
+				case <- cptimer.timer.C :
+					
+					writecp(&redisRepliInfo{runid, offset + cn.GetReadCount()},
+						 fmt.Sprintf("timeout %d millisecond", Conf.CheckPointTimeout/(1000*1000)))
+					cptimer.reset()				
+	
+				case cp := <- threshold :
+					writecp(cp, fmt.Sprintf("exceed threshold %d", Conf.CheckPointThreshold))
+					
+//				case <-time.After(time.Second * 1):
+//					cn.writeCmds(ping)
+				}
+			}
+		}()
 		
 		countReadByte := cn.GetReadCount()
 		
@@ -106,23 +127,9 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 			if  uint64(cn.GetReadCount() - countReadByte) > Conf.CheckPointThreshold {
 				
 				countReadByte = cn.GetReadCount()
-				writecp(&redisRepliInfo{runid, offset + cn.GetReadCount()},
-					 fmt.Sprintf("exceed threshold %d", Conf.CheckPointThreshold))
-			}
-			
-
-			select {
-			case <-pongchan:
-				redisReplicationACK(cn, uint64(offset + cn.GetReadCount()) )
-				
-			case <-cptimer.timer.C :
-				
-				writecp(&redisRepliInfo{runid, offset + cn.GetReadCount()},
-					 fmt.Sprintf("timeout %d millisecond", Conf.CheckPointTimeout/(1000*1000)))
-				cptimer.reset()				
-
-			case <-time.After(time.Second * 1):
-				cn.writeCmds(ping)
+				threshold <- &redisRepliInfo{runid, offset + cn.GetReadCount()}
+//				writecp(&redisRepliInfo{runid, offset + cn.GetReadCount()},
+//					 fmt.Sprintf("exceed threshold %d", Conf.CheckPointThreshold))
 			}
 
 		}
@@ -310,5 +317,5 @@ func delta(val interface{}) {
 }
 
 func redisReplicationACK(cn *conn, offset uint64){
-	cn.writeCmds( NewStringCmd("REPLCONF", "ACK", offset))
+	cn.writeCmds(NewStringCmd("REPLCONF", "ACK", offset))
 }
