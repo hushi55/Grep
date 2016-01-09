@@ -2,3 +2,4 @@
 /repli.dmp
 /rdb.dump*
 /*.log*
+/checkpoint

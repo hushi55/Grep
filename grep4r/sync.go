@@ -63,6 +63,8 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 				offset = i
 			}
 		}
+		
+		checkpoint <- &redisRepliInfo{runid, offset}
 	}
 	
 	cn.ResetReadCount()
@@ -81,6 +83,9 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 	 */
 	go full()
 
+	cptimer := newDeamonTimer(time.Second * 5)
+	StartCheckpointDeamon()
+	
 	go func() {
 		
 		defer cn.Close()
@@ -101,6 +106,11 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 			select {
 			case <-pongchan:
 				redisReplicationACK(cn, uint64(offset + cn.GetReadCount()) )
+			case <-cptimer.timer.C :
+				
+				checkpoint <- &redisRepliInfo{runid, offset + cn.GetReadCount()}
+				cptimer.reset()				
+
 			case <-time.After(time.Second * 1):
 				cn.writeCmds(ping)
 			}
