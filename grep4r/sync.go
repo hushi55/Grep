@@ -11,38 +11,6 @@ import (
 	"strconv"
 )
 
-//func queryRunid() (runid string, offset int64) {
-//
-//	addr := fmt.Sprintf("%s:%s", Conf.RedisMasterIP, Conf.RedisMasterPort)
-//	client := redis.NewClient(&redis.Options{
-//		Addr:     addr,
-//		Password: Conf.RedisMasterPasswd, // no password set
-//		DB:       0,  // use default DB
-//	})
-//
-//	cmd := redis.NewStringCmd("PSYNC", "?", -1)
-//	client.Process(cmd)
-//	v, err := cmd.Result()
-//
-//	defer client.Close()
-//
-//	runid = "?"
-//	offset = -1
-//
-//	if err == nil {
-//		items := strings.Split(v, " ")
-//		if len(items) == 3 {
-//			runid = items[1]
-//			offset, _ = strconv.ParseInt(items[2], 10, 64)
-//		}
-//	} else {
-//		log.Info("psync error : %s", err)
-//	}
-//
-//	log.Info("psync runid is %s, offset is %d", runid, offset)
-//	return
-//}
-
 var (
 	pongchan = make(chan bool)
 )
@@ -136,8 +104,6 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 				
 				countReadByte = cn.GetReadCount()
 				threshold <- &redisRepliInfo{runid, offset + cn.GetReadCount()}
-//				writecp(&redisRepliInfo{runid, offset + cn.GetReadCount()},
-//					 fmt.Sprintf("exceed threshold %d", Conf.CheckPointThreshold))
 			}
 
 		}
