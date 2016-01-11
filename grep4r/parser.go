@@ -321,9 +321,9 @@ func parseBytesReply(cn *conn, line []byte) ([]byte, error) {
 	}
 	
 	if strings.HasPrefix(bytesToString(line[1:]), "EOF:") { //EOF:0862be50e11f20e031451e4c5eeadccec276b3b4
-		log.Info("redis replication rdb file size over 4G, end of file is: %s", string(line[1:]));
+		log.Info("redis replication rdb file diskless, end of file is: %s", string(line[1:]));
 		
-		writeDumpRDBFileDiskless(bytesToString(line[6:]), cn)
+		writeDumpRDBFileDiskless(bytesToString(line[5:]), cn)
 			
 		return nil, Nil
 	}
