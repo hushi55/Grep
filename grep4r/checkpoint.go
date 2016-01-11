@@ -17,7 +17,7 @@ var (
 	cpLog        = log.NewLogger()
 	CP_FILE_NAME = "checkpoint"
 	initFlag	 = false
-	cplen        = len("[2016/01/10 00:56:22 CST] [INFO] (main.writecp:93) 09853e6ab47ec0ce0a585f0fd55118f1a4671ddd  6231782484598587392")
+	cplen        = len("[2016/01/10 00:56:22 CST] [INFO] (main.writecp:93) 09853e6ab47ec0ce0a585f0fd55118f1a4671ddd 6231782484598587392")
 )
 
 func init() {
@@ -92,5 +92,5 @@ func initRedisRepilcationInfo() (string, int64) {
 
 func writecp(cp *redisRepliInfo, msg string) {
 	log.Info("write check point to file by reason of %s ...", msg)
-	cpLog.Info("%s  %d", cp.runid, cp.offset)
+	cpLog.Info("%s %d", cp.runid, cp.offset)
 }
