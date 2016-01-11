@@ -6,10 +6,6 @@ import (
 	"fmt"
 )
 
-var (
-	RetryPsync = make(chan bool)
-)
-
 func main() {
 
 	flag.Parse()
@@ -21,17 +17,7 @@ func main() {
 	log.LoadConfiguration(Conf.Log)
 	defer log.Close()
 
-	fullsync()
-//		psync()
-
-	go func() {
-		for {
-			select {
-			case <-RetryPsync:
-				psync()
-			}
-		}
-	}()
+	SyncDaemon()
 
 	InitSignal()
 }

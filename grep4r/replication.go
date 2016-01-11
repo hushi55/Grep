@@ -14,7 +14,7 @@ type rdb_file_info struct {
 }
 
 var (
-	rdbchan = make(chan rdb_file_info)
+	rdbchan = make(chan *rdb_file_info)
 )
 
 func openReadFile(name string) (*os.File, int64) {
@@ -74,9 +74,7 @@ func writeDumpRDBFile(replyLen int, cn *conn) {
 		dumpto.Write(b)
 	}
 	
-	rdbchan <- rdb_file_info{output, uint64((replyLen + 2))}
-	
-	log.Info("redis master rdb size is %d", (replyLen + 2))
+	rdbFileWriteSuccess(output, uint64(replyLen+2), cn)
 }
 
 
@@ -114,6 +112,10 @@ func writeDumpRDBFileDiskless(eof string, cn *conn) {
 	
 	eofFlag 	:= eof
 	eofFlagLen 	:= len(eofFlag)
+	i			:= uint64(0)
+	logmask		:= power2(1000)-1
+	
+	log.Info("full eof length is %d, eof is %s", eofFlagLen, eof)
 	
 	for {
 		b, writeLen, err := readAtMost(cn, buffsize)
@@ -123,15 +125,10 @@ func writeDumpRDBFileDiskless(eof string, cn *conn) {
 			return
 		}
 		
-		
-		
 		if cn.rd.Buffered() == 0 && strings.HasSuffix(bytesToString(b[:writeLen]), eof) {
 			if writeLen > eofFlagLen {
 				dumpto.Write(b[:(writeLen-eofFlagLen)])
 				replyLen += uint64(writeLen-eofFlagLen)
-				
-				redisReplicationACK(cn, replyLen)
-				
 				break
 			}
 
@@ -140,11 +137,30 @@ func writeDumpRDBFileDiskless(eof string, cn *conn) {
 		dumpto.Write(b[:writeLen])
 		
 		replyLen += uint64(writeLen)
-		log.Info("==================================== full sync %d", replyLen)
+		
+		if (i & logmask == 0) {
+			log.Info("==================================== full sync %d", replyLen)
+		}
+		i++
 		
 	}
 	
-	rdbchan <- rdb_file_info{output, (replyLen)}
+	rdbFileWriteSuccess(output, replyLen+uint64(eofFlagLen), cn)
+}
+
+func rdbFileWriteSuccess(output string, ack uint64, cn *conn) {
 	
-	log.Info("redis master rdb size is %d", (replyLen))
+//	rdbchan <- &rdb_file_info{output, (replyLen)}
+	
+	offset := <- SYNCTYPE
+	if (offset > 0) {
+		redisReplicationACK(cn, uint64(offset)+ack) // ack
+	} else {
+		redisReplicationACK(cn, ack) 
+	}
+	
+//	redisReplicationACK(cn, ack) 
+	
+	cn.ResetReadCount() //BUG ? read count + ack length?
+	log.Info("redis master rdb size is %d, connect read count is %d, offset is %d", ack, cn.GetReadCount(), offset)
 }

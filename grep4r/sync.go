@@ -11,8 +11,12 @@ import (
 	"strconv"
 )
 
+type syncType int64
+
 var (
 	pongchan = make(chan bool)
+	SYNCTYPE = make(chan syncType, 16)
+	networkRetryPsync = make(chan bool)
 )
 
 func sync(cmd Cmder, cn *conn, other ...interface{}) {
@@ -50,13 +54,9 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 		writecp(&redisRepliInfo{runid, offset}, "sync init values")
 	}
 	
-	log.Info("write cmd succuss")
-
-	/**
-	 * full data
-	 */
-	go full()
+	SYNCTYPE <- syncType(offset)
 	
+	log.Info("write cmd succuss")
 	
 	go func() {
 		
@@ -65,6 +65,9 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 		cptimer := newDeamonTimer(Conf.CheckPointTimeout)
 		threshold := make(chan *redisRepliInfo)
 		
+		/**
+		 * closure bind connection, connect error gorutine exit , connection close
+		 */
 		go func(){
 			for {
 				select {
@@ -96,7 +99,8 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 			
 			// retry 
 			if err == io.EOF {
-				RetryPsync <- true
+				log.Error("remote %s redis master connect error, will retry", cn.RemoteAddr())
+				networkRetryPsync <- true
 				return 
 			}
 			
@@ -313,12 +317,12 @@ func psync() {
 	conn.rd = bufio.NewReader(conn)
 	
 	redisAuth(conn)
-
+	
 	sync(cmd, conn, runid, offset)
 	
 }
 
-func full() {
+func fullRDBFileParse() {
 
 	for {
 		select {
@@ -341,6 +345,33 @@ func delta(val interface{}) {
 			}
 		}
 	}
+}
+
+func networkErrorRetryPsync() {
+	for {
+		select {
+		case <- networkRetryPsync:
+			psync()
+		}
+	}
+}
+
+func SyncDaemon() {
+	
+	/**
+	 * try psync command
+	 */
+	psync()
+	
+	/**
+	 * full data
+	 */
+	go fullRDBFileParse()
+	
+	/**
+	 * network error retry
+	 */
+	go networkErrorRetryPsync()
 }
 
 func redisReplicationACK(cn *conn, offset uint64){
