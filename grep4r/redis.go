@@ -1,4 +1,4 @@
-package grep4r
+package main
 
 import ()
 
