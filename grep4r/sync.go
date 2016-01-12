@@ -15,46 +15,22 @@ type syncType int64
 
 var (
 	pongchan = make(chan bool)
-	SYNCTYPE = make(chan syncType, 16)
 	networkRetryPsync = make(chan bool)
 )
 
-func sync(cmd Cmder, cn *conn, other ...interface{}) {
+func sync(cmd Cmder, cn *conn) {
 	
-	var (
-		 offset = int64(0)
-		 runid  = "?"
-	)
-	
-	if other != nil {
-		for _, e := range other {
-			if s, ok := e.(string); ok {
-				runid = s
-			} else if i, ok2 := e.(int64); ok2 {
-				offset = i
-			}
-		}
-	}
-	
-	cn.ResetReadCount()
-
 	cn.WriteTimeout = time.Minute * 30
 	cn.ReadTimeout = time.Minute * 30
 
 	log.Info("write cmd ......")
 	cn.writeCmds(cmd)
 	
-	isFullResync, f_runid, f_offset := parseFullResync(cn)
-	if isFullResync {
-		runid = f_runid
-		offset = f_offset
-	}
+	parseFullResync(cn)
 	
-	if offset > 0 {
-		writecp(&redisRepliInfo{runid, offset}, "sync init values")
+	if cn.offset > 0 {
+		writecp(&redisRepliInfo{cn.runid, cn.offset}, "sync init values")
 	}
-	
-	SYNCTYPE <- syncType(offset)
 	
 	log.Info("write cmd succuss")
 	
@@ -72,11 +48,11 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 			for {
 				select {
 				case <- pongchan:
-					redisReplicationACK(cn, uint64(offset + cn.GetReadCount()))
+					redisReplicationACK(cn)
 					
 				case <- cptimer.timer.C :
 					
-					writecp(&redisRepliInfo{runid, offset + cn.GetReadCount()},
+					writecp(&redisRepliInfo{cn.runid, cn.offset + cn.GetReadCount()},
 						 fmt.Sprintf("timeout %d millisecond", Conf.CheckPointTimeout/(1000*1000)))
 					cptimer.reset()				
 	
@@ -107,7 +83,7 @@ func sync(cmd Cmder, cn *conn, other ...interface{}) {
 			if  uint64(cn.GetReadCount() - countReadByte) > Conf.CheckPointThreshold {
 				
 				countReadByte = cn.GetReadCount()
-				threshold <- &redisRepliInfo{runid, offset + cn.GetReadCount()}
+				threshold <- &redisRepliInfo{cn.runid, cn.offset + cn.GetReadCount()}
 			}
 
 		}
@@ -239,6 +215,9 @@ func parseFullResync(cn *conn) (bool, string, int64) {
 					
 					log.Info("read message flag: %s(%s), byte value is : %s", flag, parsemethod, val)
 					
+					cn.runid = runid
+					cn.offset = offset
+					
 					return true, runid, offset
 				}
 			}
@@ -254,8 +233,8 @@ func parseFullResync(cn *conn) (bool, string, int64) {
 func fullsync() {
 
 	log.Info("full sync cmd starting ...")
-//	cmd := NewStringCmd("SYNC")
-	cmd := NewStringCmd("PSYNC", "?", -1)
+	cmd := NewStringCmd("SYNC")
+//	cmd := NewStringCmd("PSYNC", "?", -1)
 
 	addr := fmt.Sprintf("%s:%s", Conf.RedisMasterIP, Conf.RedisMasterPort)
 	cn, err := net.DialTimeout("tcp", addr, time.Minute*30)
@@ -289,13 +268,16 @@ func redisAuth(conn *conn) {
 
 		parseConnect(conn)
 	}
+	
+	// reset auth read bytes
+	conn.ResetReadCount()
 }
 
 // psync command
 func psync() {
 
 	runid, offset := initRedisRepilcationInfo()
-
+	
 	log.Info("psync cmd starting ...")
 	cmd := NewStringCmd("PSYNC", runid, offset)
 
@@ -310,15 +292,18 @@ func psync() {
 
 	time.Sleep(time.Second * 5)
 
+	// init runid offset
 	conn := &conn{
 		netcn: cn,
 		buf:   make([]byte, 1024*1024*32),
+		runid: runid,
+		offset: offset,
 	}
 	conn.rd = bufio.NewReader(conn)
 	
 	redisAuth(conn)
 	
-	sync(cmd, conn, runid, offset)
+	sync(cmd, conn)
 	
 }
 
@@ -374,6 +359,11 @@ func SyncDaemon() {
 	go networkErrorRetryPsync()
 }
 
-func redisReplicationACK(cn *conn, offset uint64){
-	cn.writeCmds(NewStringCmd("REPLCONF", "ACK", offset))
+func redisReplicationACK(cn *conn){
+	log.Info("REPLCONF ACK %d, read count is %d", cn.offset, cn.GetReadCount())
+	if (cn.offset > 0) {
+		cn.writeCmds(NewStringCmd("REPLCONF", "ACK", cn.offset + cn.GetReadCount()))
+	} else {
+		cn.writeCmds(NewStringCmd("REPLCONF", "ACK", cn.GetReadCount()))
+	}
 }

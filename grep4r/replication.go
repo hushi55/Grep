@@ -112,12 +112,11 @@ func writeDumpRDBFileDiskless(eof string, cn *conn) {
 	
 	eofFlag 	:= eof
 	eofFlagLen 	:= len(eofFlag)
-	i			:= uint64(0)
 	logmask		:= power2(1000)-1
 	
 	log.Info("full eof length is %d, eof is %s", eofFlagLen, eof)
 	
-	for {
+	for i := uint64(0); ;i++ {
 		b, writeLen, err := readAtMost(cn, buffsize)
 		
 		if err != nil {
@@ -131,7 +130,6 @@ func writeDumpRDBFileDiskless(eof string, cn *conn) {
 				replyLen += uint64(writeLen-eofFlagLen)
 				break
 			}
-
 		} 
 		
 		dumpto.Write(b[:writeLen])
@@ -141,26 +139,29 @@ func writeDumpRDBFileDiskless(eof string, cn *conn) {
 		if (i & logmask == 0) {
 			log.Info("==================================== full sync %d", replyLen)
 		}
-		i++
 		
 	}
 	
 	rdbFileWriteSuccess(output, replyLen+uint64(eofFlagLen), cn)
 }
 
-func rdbFileWriteSuccess(output string, ack uint64, cn *conn) {
+func rdbFileWriteSuccess(output string, rdbsize uint64, cn *conn) {
+	
 	
 //	rdbchan <- &rdb_file_info{output, (replyLen)}
 	
-	offset := <- SYNCTYPE
-	if (offset > 0) {
-		redisReplicationACK(cn, uint64(offset)+ack) // ack
-	} else {
-		redisReplicationACK(cn, ack) 
-	}
+	
+	log.Info("redis master rdb size is %d, connect read count is %d, offset is %d", rdbsize, cn.GetReadCount(), cn.offset)
+	
+//	if (offset > 0) { //psync full 
+//	
+////	redisReplicationACK(cn, uint64(offset) + uint64(cn.GetReadCount())) // ack
+//		
+//		
+//	} else { // sync
+//		redisReplicationACK(cn, ack) 
+//		cn.ResetReadCount() //BUG ? read count + ack length?
+//	}
 	
 //	redisReplicationACK(cn, ack) 
-	
-	cn.ResetReadCount() //BUG ? read count + ack length?
-	log.Info("redis master rdb size is %d, connect read count is %d, offset is %d", ack, cn.GetReadCount(), offset)
 }

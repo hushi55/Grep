@@ -19,6 +19,8 @@ type conn struct {
 	buf   []byte
 	
 	rc	 atomic.Int64
+	runid 	string
+	offset 	int64
 
 	usedAt       time.Time
 	ReadTimeout  time.Duration
