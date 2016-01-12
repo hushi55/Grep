@@ -353,6 +353,13 @@ func delta(val interface{}) {
 			if strings.ToLower(vstring) == "ping" {
 				replAck <- true
 				return
+			} else if strings.ToLower(vstring) == "publish"  && len(vv) > 1   {//"PUBLISH","__sentinel__
+				if sentinel, ok := vv[1].(string); ok {
+					if (strings.HasPrefix(sentinel, "__sentinel__")) {
+						log.Info("publish sentinel info")
+						return
+					}
+				}
 			}
 		}
 	}
