@@ -9,12 +9,13 @@ import (
 	"strings"
 	"time"
 	"strconv"
+//	"Grep/grep4r/redis"
 )
 
 type syncType int64
 
 var (
-	pongchan = make(chan bool)
+	replAck = make(chan bool)
 	networkRetryPsync = make(chan bool)
 )
 
@@ -44,7 +45,7 @@ func sync(cmd Cmder, cn *conn) {
 		go func(){
 			for {
 				select {
-				case <- pongchan:
+				case <- replAck:
 					redisReplicationACK(cn)
 					
 				case <- cptimer.timer.C :
@@ -322,16 +323,51 @@ func fullRDBFileParse() {
 }
 
 func delta(val interface{}) {
+	
+	if val == nil {
+		log.Warn("redis master delta command is nil")
+		return ;
+	}
+	
+	log.Info("redis master delta command is %s", val)
+	
 	switch vv := val.(type) {
 	case []interface{}:
-		for i := 0; i < len(vv); i++ {
-			log.Info("read message items : %s", vv[i])
-			if vstring, ok := vv[i].(string); ok {
-				if strings.ToLower(vstring) == "ping" {
-					pongchan <- true
-				}
+		
+		if vstring, ok := vv[0].(string); ok {
+			if strings.ToLower(vstring) == "ping" {
+				replAck <- true
 			}
 		}
+	
+//		for i := 0; i < len(vv); i++ {
+//			if vstring, ok := vv[i].(string); ok {
+//				if strings.ToLower(vstring) == "ping" {
+//					replAck <- true
+//					continue
+//				}
+//				
+//				if isWrite, ok := redisCommands[vstring]; ok {
+//					if isWrite {
+//						log.Info("redis master [write] command is %s", vstring)
+//					} else {
+//						log.Info("redis master [read] command is %s", vstring)
+//					}
+//				} else {
+//					if i == len(vv)-1 {
+//						continue
+//					}
+//					c := fmt.Sprint("%s %s",vstring, vv[i+1])
+//					if isWrite, ok := redisCommands[c]; ok {
+//					if isWrite {
+//							log.Info("redis master [write] command is %s", c)
+//						} else {
+//							log.Info("redis master [read] command is %s", c)
+//						}
+//					}
+//				}
+//			}
+//		}
 	}
 }
 

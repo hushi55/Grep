@@ -20,8 +20,6 @@ const (
 
 type multiBulkParser func(cn *conn, n int64) (interface{}, error)
 
-type multiBulkParser4byte func(line []byte, n int64) (interface{}, error)
-
 var (
 	errReaderTooSmall = errors.New("redis: reader is too small")
 )
@@ -241,20 +239,6 @@ func readLine(cn *conn) ([]byte, error) {
 	return line, nil
 }
 
-//func readLine4byte(line []byte) ([]byte, error) {
-//	line, isPrefix, err := cn.rd.ReadLine()
-//	if err != nil {
-//		return line, err
-//	}
-//	if isPrefix {
-//		return line, errReaderTooSmall
-//	}
-//	if isNilReply(line) {
-//		return nil, Nil
-//	}
-//	return line, nil
-//}
-
 func isNilReply(b []byte) bool {
 //	return len(b) == 3 && (b[0] == '$' || b[0] == '*') && b[1] == '-' && b[2] == '1'
 	return false
@@ -458,28 +442,6 @@ func readReply(cn *conn, p multiBulkParser) (interface{}, error) {
 	return nil, fmt.Errorf("redis: can't parse %.100q", line)
 }
 
-//func readReply4byte(line []byte, p multiBulkParser) (interface{}, error) {
-//	scanner := bufio.NewScanner(strings.NewReader(string(line)))
-//	line, err := readLine(scanner)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	switch line[0] {
-//	case errorReply:
-//		return nil, parseErrorReply(cn, line)
-//	case statusReply:
-//		return parseStatusReply(cn, line)
-//	case intReply:
-//		return parseIntReply(cn, line)
-//	case stringReply:
-//		return parseBytesReply(cn, line)
-//	case arrayReply:
-//		return parseArrayReply(cn, p, line)
-//	}
-//	return nil, fmt.Errorf("redis: can't parse %.100q", line)
-//}
-
 func readScanReply(cn *conn) ([]string, int64, error) {
 	n, err := readArrayHeader(cn)
 	if err != nil {
@@ -575,26 +537,6 @@ func sliceParser(cn *conn, n int64) (interface{}, error) {
 	}
 	return vals, nil
 }
-
-//func sliceParser4byte(line []byte, n int64) (interface{}, error) {
-//	vals := make([]interface{}, 0, n)
-//	for i := int64(0); i < n; i++ {
-//		v, err := readReply(cn, sliceParser)
-//		if err == Nil {
-//			vals = append(vals, nil)
-//		} else if err != nil {
-//			return nil, err
-//		} else {
-//			switch vv := v.(type) {
-//			case []byte:
-//				vals = append(vals, string(vv))
-//			default:
-//				vals = append(vals, v)
-//			}
-//		}
-//	}
-//	return vals, nil
-//}
 
 func intSliceParser(cn *conn, n int64) (interface{}, error) {
 	ints := make([]int64, 0, n)
