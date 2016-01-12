@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 	"strconv"
-//	"Grep/grep4r/redis"
 )
 
 type syncType int64
@@ -46,7 +45,10 @@ func sync(cmd Cmder, cn *conn) {
 			for {
 				select {
 				case <- replAck:
-					redisReplicationACK(cn)
+					if cn.rd.Buffered() == 0 { // ack should in one connect 
+						log.Info("redis replication ack in one connect ")
+						redisReplicationACK(cn)
+					}
 					
 				case <- cptimer.timer.C :
 					
