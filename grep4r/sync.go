@@ -19,9 +19,6 @@ var (
 )
 
 func sync(cmd Cmder, cn *conn) {
-	
-	cn.WriteTimeout = time.Minute * 30
-	cn.ReadTimeout = time.Minute * 30
 
 	log.Info("write cmd ......")
 	cn.writeCmds(cmd)
@@ -252,6 +249,9 @@ func fullsync() {
 		buf:   make([]byte, 1024*1024*32),
 	}
 	conn.rd = bufio.NewReader(conn)
+	
+	conn.WriteTimeout = time.Minute * 30
+	conn.ReadTimeout = time.Minute * 30
 
 	redisAuth(conn)
 
@@ -300,6 +300,9 @@ func psync() {
 		offset: offset,
 	}
 	conn.rd = bufio.NewReader(conn)
+	
+	conn.WriteTimeout = time.Minute * 30
+	conn.ReadTimeout = time.Minute * 30
 	
 	redisAuth(conn)
 	
