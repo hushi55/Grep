@@ -16,8 +16,12 @@ func main() {
 
 	log.LoadConfiguration(Conf.Log)
 	defer log.Close()
+	
+	// init evnet and shutdown
+	InitEvent()
+	defer ShutdownEvent()
 
 	SyncDaemon()
-
+	
 	InitSignal()
 }

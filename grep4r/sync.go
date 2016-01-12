@@ -168,7 +168,7 @@ func parseLine(line []byte, cn *conn) {
 		parsemethod = "parseArrayReply"
 
 		if err == nil {
-			go delta(val)
+			delta(val)
 		}
 
 	}
@@ -352,9 +352,12 @@ func delta(val interface{}) {
 		if vstring, ok := vv[0].(string); ok {
 			if strings.ToLower(vstring) == "ping" {
 				replAck <- true
+				return
 			}
 		}
 	}
+	
+	newEvent(val)
 }
 
 func networkErrorRetryPsync() {
