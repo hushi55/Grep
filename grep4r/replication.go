@@ -147,21 +147,15 @@ func writeDumpRDBFileDiskless(eof string, cn *conn) {
 
 func rdbFileWriteSuccess(output string, rdbsize uint64, cn *conn) {
 	
-	
-//	rdbchan <- &rdb_file_info{output, (replyLen)}
-	
+//	rdbchan <- &rdb_file_info{output, rdbsize}
 	
 	log.Info("redis master rdb size is %d, connect read count is %d, offset is %d", rdbsize, cn.GetReadCount(), cn.offset)
 	
-//	if (offset > 0) { //psync full 
-//	
-////	redisReplicationACK(cn, uint64(offset) + uint64(cn.GetReadCount())) // ack
-//		
-//		
-//	} else { // sync
-//		redisReplicationACK(cn, ack) 
-//		cn.ResetReadCount() //BUG ? read count + ack length?
-//	}
+	if cn.offset > 0 {
+		//server will close connect after timeout(60 sec)
+		cn.ResetReadCount() // reset read count, ensure gorotuine correct write ckeck point with timeout 
+		writecp(&redisRepliInfo{cn.runid, cn.offset}, "psync full replication, server will close connect after timeout(60 sec)")
+		//retryPsync <- true
+	}
 	
-//	redisReplicationACK(cn, ack) 
 }

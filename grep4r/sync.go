@@ -15,10 +15,17 @@ type syncType int64
 
 var (
 	replAck = make(chan bool)
-	networkRetryPsync = make(chan bool)
+	retryPsync = make(chan bool)
 )
 
 func sync(cmd Cmder, cn *conn) {
+	
+	var (
+		isFull bool = false
+	)
+	
+	oldOffset := cn.offset
+	
 
 	log.Info("write cmd ......")
 	cn.writeCmds(cmd)
@@ -27,6 +34,10 @@ func sync(cmd Cmder, cn *conn) {
 	
 	if cn.offset > 0 {
 		writecp(&redisRepliInfo{cn.runid, cn.offset}, "sync init values")
+	}
+	
+	if oldOffset != cn.offset {
+		isFull = true
 	}
 	
 	log.Info("write cmd succuss")
@@ -52,8 +63,10 @@ func sync(cmd Cmder, cn *conn) {
 					
 				case <- cptimer.timer.C :
 					
-					writecp(&redisRepliInfo{cn.runid, cn.offset + cn.GetReadCount()},
-						 fmt.Sprintf("timeout %d millisecond", Conf.CheckPointTimeout/(1000*1000)))
+					if !isFull { // full relication maybe need long time
+						writecp(&redisRepliInfo{cn.runid, cn.offset + cn.GetReadCount()},
+						 	fmt.Sprintf("timeout %d millisecond", Conf.CheckPointTimeout/(1000*1000)))
+					}
 					cptimer.reset()				
 	
 				case cp := <- threshold :
@@ -76,7 +89,7 @@ func sync(cmd Cmder, cn *conn) {
 			// retry 
 			if err == io.EOF {
 				log.Error("remote %s redis master connect error, will retry", cn.RemoteAddr())
-				networkRetryPsync <- true
+				retryPsync <- true
 				return 
 			}
 			
@@ -347,7 +360,7 @@ func delta(val interface{}) {
 func networkErrorRetryPsync() {
 	for {
 		select {
-		case <- networkRetryPsync:
+		case <- retryPsync:
 			psync()
 		}
 	}
