@@ -339,35 +339,6 @@ func delta(val interface{}) {
 				replAck <- true
 			}
 		}
-	
-//		for i := 0; i < len(vv); i++ {
-//			if vstring, ok := vv[i].(string); ok {
-//				if strings.ToLower(vstring) == "ping" {
-//					replAck <- true
-//					continue
-//				}
-//				
-//				if isWrite, ok := redisCommands[vstring]; ok {
-//					if isWrite {
-//						log.Info("redis master [write] command is %s", vstring)
-//					} else {
-//						log.Info("redis master [read] command is %s", vstring)
-//					}
-//				} else {
-//					if i == len(vv)-1 {
-//						continue
-//					}
-//					c := fmt.Sprint("%s %s",vstring, vv[i+1])
-//					if isWrite, ok := redisCommands[c]; ok {
-//					if isWrite {
-//							log.Info("redis master [write] command is %s", c)
-//						} else {
-//							log.Info("redis master [read] command is %s", c)
-//						}
-//					}
-//				}
-//			}
-//		}
 	}
 }
 
