@@ -1,9 +1,10 @@
 package main
 
 import (
-	log "code.google.com/p/log4go"
 	"flag"
 	"fmt"
+	log "code.google.com/p/log4go"
+	"github.com/hushi55/golib/signal"
 )
 
 func main() {
@@ -23,5 +24,5 @@ func main() {
 
 	SyncDaemon()
 	
-	InitSignal()
+	signal.InitSignal(reload)
 }
