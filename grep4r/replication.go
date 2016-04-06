@@ -128,6 +128,7 @@ func writeDumpRDBFileDiskless(eof string, cn *conn) {
 			if writeLen > eofFlagLen {
 				dumpto.Write(b[:(writeLen-eofFlagLen)])
 				replyLen += uint64(writeLen-eofFlagLen)
+				cn.writeCmds(NewStringCmd("REPLCONF", "ACK", replyLen))
 				break
 			}
 		} 
@@ -150,6 +151,8 @@ func rdbFileWriteSuccess(output string, rdbsize uint64, cn *conn) {
 //	rdbchan <- &rdb_file_info{output, rdbsize}
 	
 	log.Info("redis master rdb size is %d, connect read count is %d, offset is %d", rdbsize, cn.GetReadCount(), cn.offset)
+	
+//	replAck <- true
 	
 	if cn.offset > 0 {
 		//server will close connect after timeout(60 sec)

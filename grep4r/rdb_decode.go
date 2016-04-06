@@ -11,11 +11,21 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	
 	rdb "Grep/grep4r/rdb"
 	log "code.google.com/p/log4go"
 //	"github.com/wandoulabs/redis-port/pkg/libs/atomic2"
 )
+
+var (
+	keyLog        = log.NewLogger()
+	keys		 =  map[string]struct{}{}
+)
+
+func init() {
+	keyLog.AddFilter("log", log.FINE, log.NewFileLogWriter("keys-test", false))
+}
 
 const (
 	ReaderBufferSize = 1024 * 1024 * 32
@@ -188,6 +198,14 @@ func decoder(ipipe <-chan *rdb.BinEntry) {
 					toText(ele.Member), toBase64(ele.Member), ele.Score,
 				}
 				fmt.Fprintf(&b, "%s\n", toJson(o))
+				
+				if strings.HasPrefix(o.Key, "00000:z_group_msg")  {
+					_, exists := keys[o.Key]
+					if !exists {
+						keys[o.Key] = struct{}{}
+						keyLog.Info(o.Key)
+					} 
+				}
 			}
 		}
 //		opipe <- b.String()

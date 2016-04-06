@@ -381,7 +381,9 @@ func SyncDaemon() {
 	/**
 	 * try psync command
 	 */
-	psync()
+//	psync()
+	fullsync()
+	
 	
 	/**
 	 * full data
