@@ -30,7 +30,9 @@ func sync(cmd Cmder, cn *conn) {
 	log.Info("write cmd ......")
 	cn.writeCmds(cmd)
 	
-	parseFullResync(cn)
+	if cn.offset != 0 {
+		parseFullResync(cn)
+	}
 	
 	if cn.offset > 0 {
 		writecp(&redisRepliInfo{cn.runid, cn.offset}, "sync init values")
@@ -381,8 +383,8 @@ func SyncDaemon() {
 	/**
 	 * try psync command
 	 */
-//	psync()
-	fullsync()
+	psync()
+//	fullsync()
 	
 	
 	/**

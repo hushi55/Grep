@@ -115,6 +115,20 @@ func writeDumpRDBFileDiskless(eof string, cn *conn) {
 	logmask		:= power2(1000)-1
 	
 	log.Info("full eof length is %d, eof is %s", eofFlagLen, eof)
+//	cn.ResetReadCount()
+	
+	/**
+	 * add replication ack 
+	 */
+	go func() {
+		for {
+			select {
+				case <-time.After(time.Second * 30):
+					log.Info("************* redis replication ack interval 30 secends ")
+					redisReplicationACK(cn)
+			}
+		}
+	}()
 	
 	for i := uint64(0); ;i++ {
 		b, writeLen, err := readAtMost(cn, buffsize)
@@ -128,7 +142,6 @@ func writeDumpRDBFileDiskless(eof string, cn *conn) {
 			if writeLen > eofFlagLen {
 				dumpto.Write(b[:(writeLen-eofFlagLen)])
 				replyLen += uint64(writeLen-eofFlagLen)
-				cn.writeCmds(NewStringCmd("REPLCONF", "ACK", replyLen))
 				break
 			}
 		} 
@@ -152,7 +165,7 @@ func rdbFileWriteSuccess(output string, rdbsize uint64, cn *conn) {
 	
 	log.Info("redis master rdb size is %d, connect read count is %d, offset is %d", rdbsize, cn.GetReadCount(), cn.offset)
 	
-//	replAck <- true
+	replAck <- true
 	
 	if cn.offset > 0 {
 		//server will close connect after timeout(60 sec)
